@@ -6,7 +6,7 @@ HANDLE hCommR, hCommW;   // Handle to the Serial ports
 
 int finish_program(int status) {
     CloseHandle(hCommR); //Closing the serial port for reading
-    CloseHandle(hCommW); //Closing the serial port for reading
+    CloseHandle(hCommW); //Closing the serial port for writing
     printf("\n======================== Finish =========================\n");
 
     getchar();
