@@ -1,7 +1,7 @@
 # A project to implement a connection between two COM ports.
 
 ### Requirements:
-- For the project to work, it is required to organize a physical connection between two COM ports. For example, between two USB-to-COM bridges connected.
+- For the project to work, it is required to organize a physical connection between two COM ports in the system. For example, between two USB-to-COM bridges connected to a PC with the appropriate drivers installed.
 - Before compiling the program, you must specify the actual names of the ports issued by the system for the `rComPortName` and `wComPortName` variables.
 
 ### Work description:
