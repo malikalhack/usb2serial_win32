@@ -17,15 +17,14 @@ int main() {
     char   rComPortName[] = "\\\\.\\COM3";  // Serial port name to read
     char   wComPortName[] = "\\\\.\\COM4";  // Serial port name to write
     DWORD  dwEventMask;                     // Event mask to trigger
-    char   TempChar;                        // Temperory Character
     char   SerialBuffer[256];               // Buffer Containing Rxed Data
-    DWORD  NoBytesRead;                     // Bytes read by ReadFile()
+    DWORD  NumBytesRead;                     // Bytes read by ReadFile()
 
     char   lpBuffer[] = "Hello world!";     // lpBuffer should be char or byte array
-    DWORD  dNoOFBytestoWrite;               // Number of bytes to write to the port
-    DWORD  dNoOfBytesWritten = 0;           // Number of bytes written to the port
+    DWORD  dNumOfBytes2Write;               // Number of bytes to write to the port
+    DWORD  dNumOfBytesWritten = 0;          // Number of bytes written to the port
 
-    dNoOFBytestoWrite = sizeof(lpBuffer);   // Calculating the number of bytes to write to a port
+    dNumOfBytes2Write = sizeof(lpBuffer);   // Calculating the number of bytes to write to a port
     int i = 0;
 
 /*------------------------- Opening the Serial Port --------------------------*/
@@ -138,7 +137,7 @@ int main() {
 #endif // _DEBUG
 
 /*--------------------------- Setting Receive Mask ---------------------------*/
-    //Configure Windows to Monitor the serial device for Character Reception
+    //Set up Windows to monitor the serial port for receiving characters.
     if (SetCommMask(hCommR, EV_RXCHAR) == FALSE) {
         printf("Error >> The SetCommMask() function ended with an error\n");
         return finish_program(EXIT_FAILURE);
@@ -150,10 +149,10 @@ int main() {
 /*-------------------- Writing a Character to Serial Port --------------------*/
     if (
         WriteFile(
-            hCommW,             // Handle to the Serialport
-            lpBuffer,           // Data to be written to the port 
-            dNoOFBytestoWrite,  // No of bytes to write into the port
-            &dNoOfBytesWritten, // No of bytes written to the port
+            hCommW,              // Handle to the Serialport
+            lpBuffer,            // Data to be written to the port 
+            dNumOfBytes2Write,   // Number of bytes to write to the port
+            &dNumOfBytesWritten, // Number of bytes written to the port
             NULL
         ) == TRUE
     ) {
@@ -173,18 +172,18 @@ int main() {
         return finish_program(EXIT_FAILURE);
     }
     else {
-        //Read the RXed data using ReadFile();
+        //Read the recived data using ReadFile();
         printf("Characters received:\n");
+        char TempChar;  // Temporary character
         do {
-            ReadFile(hCommR, &TempChar, sizeof(TempChar), &NoBytesRead, NULL);
+            ReadFile(hCommR, &TempChar, sizeof(TempChar), &NumBytesRead, NULL);
             SerialBuffer[i] = TempChar;
             i++;
-        } while (NoBytesRead > 0);
+        } while (NumBytesRead > 0);
 
-/*------------------- Printing the RXed String to Console --------------------*/
+/*------------------- Printing the recived data to Console --------------------*/
         int j = 0;
         for (j = 0; j < i - 1; j++) {
-            // j < i-1 to remove the dupliated last character
             printf("%c", SerialBuffer[j]);
         }
     }
