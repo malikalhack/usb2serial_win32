@@ -1,18 +1,37 @@
 ﻿#include <Windows.h>
 #include <stdio.h>
+#include <cstdlib>
+
+HANDLE hCommR, hCommW;   // Handle to the Serial ports
+
+int finish_program(int status) {
+    CloseHandle(hCommR); //Closing the serial port for reading
+    CloseHandle(hCommW); //Closing the serial port for reading
+    printf("\n======================== Finish =========================\n");
+
+    getchar();
+    return status;
+}
 
 int main() {
-    HANDLE hComm;                           // Handle to the Serial port
-    char  ComPortName[] = "\\\\.\\COM3";    // Name of the Serial port
+    char   rComPortName[] = "\\\\.\\COM3";  // Serial port name to read
+    char   wComPortName[] = "\\\\.\\COM4";  // Serial port name to write
     DWORD  dwEventMask;                     // Event mask to trigger
     char   TempChar;                        // Temperory Character
     char   SerialBuffer[256];               // Buffer Containing Rxed Data
     DWORD  NoBytesRead;                     // Bytes read by ReadFile()
+
+    char   lpBuffer[] = "Hello world!";     // lpBuffer should be char or byte array
+    DWORD  dNoOFBytestoWrite;               // Number of bytes to write to the port
+    DWORD  dNoOfBytesWritten = 0;           // Number of bytes written to the port
+
+    dNoOFBytestoWrite = sizeof(lpBuffer);   // Calculating the number of bytes to write to a port
     int i = 0;
 
 /*------------------------- Opening the Serial Port --------------------------*/
-     hComm = CreateFile(
-        ComPortName,                        // Name of the Port to be Opened
+    printf("\n========================= Start =========================\n\n");
+    hCommR = CreateFile(
+        rComPortName,                       // Name of the Port to be Opened
         GENERIC_READ | GENERIC_WRITE,       // Read/Write Access
         0,                                  // No Sharing, ports cant be shared
         NULL,                               // No Security
@@ -21,83 +40,148 @@ int main() {
         NULL                                // Null for Comm Devices
      );
 
-    if (hComm == INVALID_HANDLE_VALUE) {
-        printf("\n    Error! - Port %s can't be opened\n", ComPortName);
+    if (hCommR == INVALID_HANDLE_VALUE) {
+        printf("Error >>> Port %s can't be opened\n", rComPortName);
+        return finish_program(EXIT_FAILURE);
     }
-    else {
-        printf("\n    Port %s Opened\n ", ComPortName);
+    else printf("Port %s is opened\n", rComPortName);
+
+    hCommW = CreateFile(
+        wComPortName,                       // Name of the Port to be Opened
+        GENERIC_READ | GENERIC_WRITE,       // Read/Write Access
+        0,                                  // No Sharing, ports cant be shared
+        NULL,                               // No Security
+        OPEN_EXISTING,                      // Open existing port only
+        0,                                  // Non Overlapped I/O
+        NULL                                // Null for Comm Devices
+    );
+
+    if (hCommW == INVALID_HANDLE_VALUE) {
+        printf("Error >>> Port %s can't be opened\n", wComPortName);
+        return finish_program(EXIT_FAILURE);
     }
+    else printf("Port %s is opened\n", wComPortName);
 
 /*----------------- Setting the Parameters for the SerialPort ----------------*/
-    DCB dcbSerialParams       = { 0 };      // Initializing DCB structure
-    dcbSerialParams.DCBlength = sizeof(dcbSerialParams);
+    DCB dcbSerialParamsR = { 0 }; // Initializing DCB structure for the read port
+    DCB dcbSerialParamsW = { 0 }; // Initializing DCB structure for the write port
+
+    dcbSerialParamsR.DCBlength = sizeof(dcbSerialParamsR);
+    dcbSerialParamsW.DCBlength = sizeof(dcbSerialParamsW);
 
     //retreives  the current settings
-    if (GetCommState(hComm, &dcbSerialParams) == FALSE) { 
-        printf("\n    Error! in GetCommState()");
+    if (
+        GetCommState(hCommR, &dcbSerialParamsR) == FALSE ||
+        GetCommState(hCommW, &dcbSerialParamsW) == FALSE
+    ) { 
+        printf("Error >> The GetCommState() function ended with an error\n");
+        return finish_program(EXIT_FAILURE);
     }
 
-    dcbSerialParams.BaudRate = CBR_115200;  // Setting BaudRate = 115200
-    dcbSerialParams.ByteSize = 8;           // Setting ByteSize = 8
-    dcbSerialParams.StopBits = ONESTOPBIT;  // Setting StopBits = 1
-    dcbSerialParams.Parity   = NOPARITY;    // Setting Parity   = None
+    dcbSerialParamsR.BaudRate = CBR_115200;  // BaudRate for the read port = 115200
+    dcbSerialParamsR.ByteSize = 8;           // ByteSize for the read port = 8
+    dcbSerialParamsR.StopBits = ONESTOPBIT;  // StopBits for the read port = 1
+    dcbSerialParamsR.Parity   = NOPARITY;    // Parity for the read port   = None
+
+    dcbSerialParamsW.BaudRate = CBR_115200;  // BaudRate for the write port = 115200
+    dcbSerialParamsW.ByteSize = 8;           // ByteSize for the write port = 8
+    dcbSerialParamsW.StopBits = ONESTOPBIT;  // StopBits for the write port = 1
+    dcbSerialParamsW.Parity   = NOPARITY;    // Parity for the write port   = None
 
     //Configuring the port according to settings in DCB 
-    if (SetCommState(hComm, &dcbSerialParams) == FALSE) {
-        printf("\n    Error! in Setting DCB Structure");
+    if (
+        SetCommState(hCommR, &dcbSerialParamsR) == FALSE ||
+        SetCommState(hCommW, &dcbSerialParamsW) == FALSE
+    ) {
+        printf("Error >> The SetCommState() function ended with an error\n");
+        return finish_program(EXIT_FAILURE);
     }
-    else { 
+#ifdef _DEBUG
+    else {
         // Successfull display the contents of the DCB Structure
-        printf("\n\n    Setting DCB Structure Successfull\n");
-        printf("\n       Baudrate = %d", dcbSerialParams.BaudRate);
-        printf("\n       ByteSize = %d", dcbSerialParams.ByteSize);
-        printf("\n       StopBits = %d", dcbSerialParams.StopBits);
-        printf("\n       Parity   = %d", dcbSerialParams.Parity);
+        printf("\n\nSetting DCB Structure Successfull:\n\n");
+        printf("Baudrate for the read port  = %d\n", dcbSerialParamsR.BaudRate);
+        printf("ByteSize for the read port  = %d\n", dcbSerialParamsR.ByteSize);
+        printf("StopBits for the read port  = %d\n", dcbSerialParamsR.StopBits);
+        printf("Parity for the read port    = %d\n\n", dcbSerialParamsR.Parity);
+        printf("Baudrate for the write port = %d\n", dcbSerialParamsW.BaudRate);
+        printf("ByteSize for the write port = %d\n", dcbSerialParamsW.ByteSize);
+        printf("StopBits for the write port = %d\n", dcbSerialParamsW.StopBits);
+        printf("Parity for the write port   = %d\n\n", dcbSerialParamsW.Parity);
     }
+#endif // DEBUG
 
 /*----------------------------- Setting Timeouts -----------------------------*/
-    COMMTIMEOUTS timeouts                = { 0 };
-    timeouts.ReadIntervalTimeout         = 50;
-    timeouts.ReadTotalTimeoutConstant    = 50;
-    timeouts.ReadTotalTimeoutMultiplier  = 10;
-    timeouts.WriteTotalTimeoutConstant   = 50;
-    timeouts.WriteTotalTimeoutMultiplier = 10;
+    COMMTIMEOUTS rTimeouts = { 0 }, wTimeouts = { 0 };
 
-    if (SetCommTimeouts(hComm, &timeouts) == FALSE) {
-        printf("\n\n    Error! in Setting Time Outs");
+    rTimeouts.ReadIntervalTimeout         = 50;
+    rTimeouts.ReadTotalTimeoutConstant    = 50;
+    rTimeouts.ReadTotalTimeoutMultiplier  = 10;
+    rTimeouts.WriteTotalTimeoutConstant   = 50;
+    rTimeouts.WriteTotalTimeoutMultiplier = 10;
+
+    wTimeouts.ReadIntervalTimeout         = 50;
+    wTimeouts.ReadTotalTimeoutConstant    = 50;
+    wTimeouts.ReadTotalTimeoutMultiplier  = 10;
+    wTimeouts.WriteTotalTimeoutConstant   = 50;
+    wTimeouts.WriteTotalTimeoutMultiplier = 10;
+
+    if (
+        SetCommTimeouts(hCommR, &rTimeouts) == FALSE ||
+        SetCommTimeouts(hCommW, &wTimeouts) == FALSE
+    ) {
+        printf("Error >> The SetCommTimeouts() function ended with an error\n");
+        return finish_program(EXIT_FAILURE);
     }
-    else {
-        printf("\n\n    Setting Serial Port Timeouts Successfull");
-    }
+#ifdef _DEBUG
+    else printf("Serial Ports Timeout Setting Succeeded\n");
+#endif // _DEBUG
 
 /*--------------------------- Setting Receive Mask ---------------------------*/
     //Configure Windows to Monitor the serial device for Character Reception
-    if (SetCommMask(hComm, EV_RXCHAR) == FALSE) {
-        printf("\n\n    Error! in Setting CommMask");
+    if (SetCommMask(hCommR, EV_RXCHAR) == FALSE) {
+        printf("Error >> The SetCommMask() function ended with an error\n");
+        return finish_program(EXIT_FAILURE);
+    }
+#ifdef _DEBUG
+    else printf("Communication mask port setup successful\n");
+#endif // _DEBUG
+
+/*-------------------- Writing a Character to Serial Port --------------------*/
+    if (
+        WriteFile(
+            hCommW,             // Handle to the Serialport
+            lpBuffer,           // Data to be written to the port 
+            dNoOFBytestoWrite,  // No of bytes to write into the port
+            &dNoOfBytesWritten, // No of bytes written to the port
+            NULL
+        ) == TRUE
+    ) {
+        printf("\n%s - Written to %s\n", lpBuffer, wComPortName);
     }
     else {
-        printf("\n\n    Setting CommMask successfull");
+        printf("\nError >>> %d in Writing to Serial Port\n", GetLastError());
+        return finish_program(EXIT_FAILURE);
     }
 
 /*------------------------- Setting WaitComm() Event -------------------------*/
 /*----------- Program will Wait here till a Character is received ------------*/
-    printf("\n\n    Waiting for Data Reception");
-
-    if (WaitCommEvent(hComm, &dwEventMask, NULL) == FALSE) {
-        //Wait for the character to be received
-        printf("\n    Error! in Setting WaitCommEvent()");
+    printf("\n============== Waiting for Data Reception ===============\n\n");
+    //Wait for the character to be received
+    if (WaitCommEvent(hCommR, &dwEventMask, NULL) == FALSE) {
+        printf("Error >> The WaitCommEvent() function ended with an error\n");
+        return finish_program(EXIT_FAILURE);
     }
     else {
         //Read the RXed data using ReadFile();
-        printf("\n\n    Characters Received");
+        printf("Characters received:\n");
         do {
-            ReadFile(hComm, &TempChar, sizeof(TempChar), &NoBytesRead, NULL);
+            ReadFile(hCommR, &TempChar, sizeof(TempChar), &NoBytesRead, NULL);
             SerialBuffer[i] = TempChar;
             i++;
         } while (NoBytesRead > 0);
 
-        /*------------------- Printing the RXed String to Console --------------------*/
-        printf("\n\n    ");
+/*------------------- Printing the RXed String to Console --------------------*/
         int j = 0;
         for (j = 0; j < i - 1; j++) {
             // j < i-1 to remove the dupliated last character
@@ -106,9 +190,6 @@ int main() {
     }
 
 /*--------------------------------- Finish -----------------------------------*/
-    CloseHandle(hComm); //Closing the Serial Port
-    printf("\n==========================================\n");
-
-    getchar();
-    return 0;
+    printf("\n");
+    return finish_program(EXIT_SUCCESS);
 }
